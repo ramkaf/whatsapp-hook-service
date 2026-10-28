@@ -2,7 +2,11 @@
   "compilerOptions": {
     "module": "nodenext",
     "moduleResolution": "nodenext",
+    "rewriteRelativeImportExtensions": true,
     "resolvePackageJsonExports": true,
+    "paths": {
+      "#common": ["./src/libs/common/index.ts"]
+    },
     "esModuleInterop": true,
     "isolatedModules": true,
     "declaration": true,

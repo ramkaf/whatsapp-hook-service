@@ -25,6 +25,17 @@
 
 WhatsApp webhook service built with NestJS and TypeScript (ES modules).
 
+Use `.ts` extensions for relative source imports, for example
+`import { AppModule } from './app.module.ts'`. TypeScript rewrites these to `.js`
+in the compiled output via `rewriteRelativeImportExtensions`, so the build runs
+with Node's native ES modules.
+
+Import shared utilities through `import { BaseLogUtil } from '#common'`.
+The `paths` mapping in `tsconfig.json` resolves `#common` to
+`src/libs/common/index.ts` for TypeScript and tests. The matching `imports`
+entry in `package.json` resolves it to `dist/libs/common/index.js` at runtime.
+This is a local alias; `src/libs/common` remains a regular source folder.
+
 ## Project map
 
 - `src/main.ts`: creates the Nest application and listens on the configured port.
@@ -46,7 +57,7 @@ do not use an env file to select a stage. Unknown stages fail at startup.
 Copy the example files for the stages you use:
 
 ```bash
-cp .env.development.example .env.development
+cp .env.example .env
 cp .env.staging.example .env.staging
 cp .env.production.example .env.production
 ```
@@ -102,8 +113,21 @@ from the selected files and runtime variables; other stages' files are not loade
 
 ## Project setup
 
+Use Node.js 26.12.1 (pinned in `.nvmrc`). With nvm:
+
 ```bash
-$ npm install
+nvm install
+nvm use
+```
+
+The dependency tree requires Node.js `^22.22.3 || ^24.15.0 || >=26.0.0`.
+Node.js 18 cannot parse the `/v` regular expressions used by the CLI dependencies.
+The engine check in `.npmrc` rejects unsupported Node versions during installation.
+Run `nvm use` in each new terminal before running project commands.
+
+```bash
+pnpm install
+pnpm start:dev
 ```
 
 ## Compile and run the project
