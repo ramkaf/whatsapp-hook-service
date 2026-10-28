@@ -1,17 +1,31 @@
+import afraLogger from '@afra/exchange-logger';
+
+afraLogger.start({
+  apm: {
+    ...logsConfiguration().logs,
+    active: true,
+    captureBody: 'off',
+  },
+  logger: {
+    file: { enabled: false },
+  },
+  rabbitmq: {
+    enabled: true,
+  },
+});
+
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { ConfigService } from '@nestjs/config';
-import { AppModule } from './app.module.js';
-import type { EnvironmentVariables } from './config/interfaces/env.interface.js';
+import { AppModule } from './app.module.ts';
+import { appConfiguration, logsConfiguration } from '#common';
+import exchangeLogger from '@afra/exchange-logger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  const config = app.get(ConfigService<EnvironmentVariables, true>);
-  const port = config.getOrThrow('PORT', { infer: true });
-
+  const {name:appName , port} = appConfiguration().app;
   await app.listen(port);
-
-  Logger.log(`WhatsApp service is running on port ${port}`, 'Bootstrap');
+  exchangeLogger.logger.info(`${appName} is running on port ${port}`)
+  Logger.log(`${appName} is running on port ${port}`, 'Bootstrap');
 }
 
 await bootstrap();

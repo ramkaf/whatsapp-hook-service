@@ -1,8 +1,7 @@
 import { Module } from '@nestjs/common';
-import { AppConfigModule } from './config/app-config.module.js';
-import { WhatsappWebhookModule } from './whatsapp-webhook-server/whatsapp-webhook-server.module.js';
+import { WhatsappWebhookModule } from './whatsapp-webhook-server/whatsapp-webhook-server.module.ts';
 
 @Module({
-  imports: [AppConfigModule, WhatsappWebhookModule],
+  imports: [WhatsappWebhookModule],
 })
 export class AppModule {}
