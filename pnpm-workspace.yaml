@@ -1,0 +1,7 @@
+allowBuilds:
+  # Baileys only checks that Node.js is >=20.
+  baileys@7.0.0-rc14: true
+  # Optional compatibility warning; runtime does not need this script.
+  protobufjs: false
+  # Swagger UI's optional install analytics; no runtime build is needed.
+  '@scarf/scarf': false

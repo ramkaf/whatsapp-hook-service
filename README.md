@@ -39,12 +39,15 @@ This is a local alias; `src/libs/common` remains a regular source folder.
 ## Project map
 
 - `src/main.ts`: creates the Nest application and listens on the configured port.
-- `src/app.module.ts`: imports configuration and the WhatsApp webhook module.
-- `src/config/`: global configuration, stage selection, and startup validation.
-- `src/whatsapp-webhook-server/whatsapp-webhook-server.module.ts`: registers the webhook controller, providers, and repository.
-- `src/whatsapp-webhook-server/controllers/whatsapp-webhook-server.controller.ts`: `GET /whatsapp-webhook` returns `OK`; `POST /whatsapp-webhook` acknowledges receipt.
-- `src/whatsapp-webhook-server/providers/`: placeholder webhook, payload, signature, and event services. The event service is not registered yet.
-- `src/whatsapp-webhook-server/repository/`: placeholder webhook repository.
+- `src/app.module.ts`: imports the WhatsApp module.
+- `src/whatsapp/whatsapp.module.ts`: registers the controller, providers, and API guard.
+- `src/whatsapp/controllers/`: HTTP endpoints and their tests.
+- `src/whatsapp/providers/`: Baileys connection, group monitoring, message handler, and provider tests.
+- `src/whatsapp/guards/`: bearer token validation and its tests.
+- `src/libs/common/docs/`: reusable controller/endpoint docs decorators, shared error DTO, and Swagger setup.
+- `src/whatsapp/dto/`: Swagger request and response schemas.
+- `src/libs/common/config/`: shared configuration factories.
+- `src/libs/common/providers/`: shared logging services, exported through `#common`.
 - `vitest.config.ts` and `vitest.config.e2e.ts`: unit and end-to-end test configuration.
 - `docker-compose.yml`: currently empty; container deployment is not configured.
 
@@ -129,6 +132,175 @@ Run `nvm use` in each new terminal before running project commands.
 pnpm install
 pnpm start:dev
 ```
+
+## Swagger API documentation
+
+Start the server with `pnpm start:dev`, then open `http://localhost:3000/docs`
+(use your configured `APP_PORT` if different). The OpenAPI JSON is available at
+`/docs-json` for import into Postman or client generation.
+
+Click **Authorize**, paste the value of `WHATSAPP_API_TOKEN` without the `Bearer`
+prefix, then use **Try it out** on the WhatsApp endpoints. Swagger does not
+prepopulate your token or persist it across page reloads.
+
+The docs cover connection, status, QR JSON/PNG, joined groups, and group message
+sending, including request examples and error responses. Pairing starts only when you execute the
+connect request; sending a message requires executing the messages request.
+
+Controllers define their own titles, descriptions, and schemas using shared
+decorators from `#common`. The implementation lives in
+`src/libs/common/docs/api-docs.decorators.ts` and has no WhatsApp-specific imports:
+
+```ts
+@ApiControllerDocs({ tag: 'WhatsApp', bearerAuth: 'whatsapp-token' })
+@Controller('whatsapp')
+export class WhatsappController {
+  @Get('status')
+  @ApiEndpointDocs({
+    summary: 'Get connection status',
+    description: 'Check whether the linked account is connected.',
+    responses: [{ status: 200, type: WhatsappStatusDto }],
+  })
+  status() {
+    return this.whatsapp.getStatus();
+  }
+}
+```
+
+`ApiControllerDocs` supports shared response definitions; `ApiEndpointDocs`
+supports an optional request `body` and Swagger response options, including
+JSON DTOs, arrays, and binary content. These helpers document authentication;
+the controller's `@UseGuards` decorator continues to enforce it.
+
+## Send a message to an existing WhatsApp group (Baileys)
+
+`src/whatsapp/` links your WhatsApp Business phone app as a companion device.
+It uses Baileys `7.0.0-rc14` (ES modules); it does not use the Meta Cloud API
+or the `/whatsapp-webhook` endpoints.
+
+1. Add the settings from `.env.whatsapp.example` to your existing `.env`.
+   Generate `WHATSAPP_API_TOKEN` with
+   `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`.
+   Keep the token private. The new endpoints require `Authorization: Bearer <token>`;
+   they return 503 until the token is configured.
+2. Run `nvm use` and `pnpm start:dev` from the project root.
+3. In a second terminal, set the same token and the app URL (the current app
+   uses `APP_PORT`, default `3000`):
+
+   ```bash
+   export WHATSAPP_API_TOKEN='your-private-token-from-env'
+   export WHATSAPP_URL='http://localhost:3000'
+   curl -X POST "$WHATSAPP_URL/whatsapp/connect" \
+     -H "Authorization: Bearer $WHATSAPP_API_TOKEN"
+   ```
+
+4. Scan the QR printed in the server terminal using **WhatsApp Business →
+   Settings → Linked devices → Link a device** on the account that already
+   belongs to the group. QR codes refresh while pairing; use the newest one.
+   You can also get the QR through the API (same bearer token required):
+
+   - `GET /whatsapp/qr` returns JSON with `qr` (raw pairing text) and
+     `qrDataUrl` (PNG data URL suitable for an HTML image's `src`).
+   - `GET /whatsapp/qr/image` returns an inline PNG; in Postman, use the image
+     preview. It returns 404 while no QR is available.
+
+   `POST /whatsapp/connect` also returns the QR fields when already available.
+   The first response may have `qrDataUrl: null` because WhatsApp has not emitted
+   a QR yet. Poll `/whatsapp/qr` every two seconds while connecting or awaiting
+   pairing; stop after `status: connected`. Fetch again if a QR rotates or expires.
+   QR data is kept only in memory, cleared on connection or disconnect, and
+   returned with `Cache-Control: no-store`.
+
+   If `hasSavedSession` is true, Baileys is restoring a previous linked-device
+   login rather than generating a new QR. Wait for `status: connected` using
+   `/whatsapp/status`. A non-null `accountJid` alone does not mean the connection
+   is ready. `qrUnavailableReason` explains why the QR is missing; the PNG
+   endpoint includes the same status information in its 404 response. If it
+   keeps reconnecting, inspect `lastDisconnectCode` and the server logs.
+   For a deliberately fresh pairing, stop the server, set `WHATSAPP_AUTH_DIR`
+   to a new empty directory inside `.data/`, restart, and connect again. This
+   preserves the old credentials; it does not unlink the old device on the phone.
+
+5. Check the status, then list the account's existing groups:
+
+   ```bash
+   curl "$WHATSAPP_URL/whatsapp/status" \
+     -H "Authorization: Bearer $WHATSAPP_API_TOKEN"
+   # Wait for status: connected.
+   curl "$WHATSAPP_URL/whatsapp/groups" \
+     -H "Authorization: Bearer $WHATSAPP_API_TOKEN"
+   ```
+
+6. Copy the chosen group's `id` (ending in `@g.us`) and send a message:
+
+   ```bash
+   curl -X POST "$WHATSAPP_URL/whatsapp/messages" \
+     -H "Authorization: Bearer $WHATSAPP_API_TOKEN" \
+     -H 'Content-Type: application/json' \
+     -d '{"groupJid":"120363000000000000@g.us","text":"Hello from our WhatsApp service"}'
+   ```
+
+The response contains `groupJid`, `messageId`, and `status: "sent"`. This means
+Baileys completed the send call, not that every member received or read it.
+Only groups the linked account belongs to are allowed. WhatsApp still enforces
+group restrictions, including admin-only posting. Sends are not automatically
+retried; check the group before retrying an uncertain result.
+
+Credentials are saved in `.data/whatsapp-auth` (ignored by Git). Keep this
+directory private and persistent; it contains account access credentials. Use
+one app process per session. After restarting the server, call `/whatsapp/connect`
+again; saved credentials normally avoid another QR scan. Temporary disconnects
+reconnect automatically. Shutdown closes the connection without logging out.
+If the status is `logged_out`, stop the server, remove only that session's auth
+directory, restart, and connect/scan again. A custom `WHATSAPP_AUTH_DIR` should
+also be excluded from version control.
+
+This first implementation uses Baileys' file-based auth helper for local use.
+Use a database-backed auth store before running multiple instances or deploying
+this as a production service. No message is sent during startup or pairing.
+
+## Monitor incoming group messages
+
+After `/whatsapp/connect` pairs the account, incoming messages from **all joined
+groups** run `GroupMessageHandler.handle(context)` in
+`src/whatsapp/providers/group-message.handler.ts`. Inject your application services there
+and call their functions with the context. For asynchronous work, make `handle`
+an `async` method and await your functions.
+
+The typed context (`src/whatsapp/group-message.context.ts`) contains:
+
+- `text` (text or media caption), `type`, `messageId`, `sentAt`, and `receivedAt`.
+- `sender`: WhatsApp JID, alternate JID, phone number when available, display
+  name, available contact data, and group participant data (including admin role).
+- `group`: full group metadata when retrievable, including name and participants.
+- `content`: normalized message content, including media metadata.
+- `raw`: the original Baileys message, preserving mentions, replies, and other fields.
+
+Example customization inside `GroupMessageHandler`:
+
+```ts
+async handle(context: GroupMessageContext): Promise<void> {
+  await this.yourService.process(context);
+}
+```
+
+The default example logs the message type and ID; it does not print message
+content or sender contact details. Profile/contact information depends on what
+WhatsApp supplies: names, phone numbers and group metadata can be unavailable.
+An `@lid` identity is never treated as a phone number. Media bytes are not
+automatically downloaded; media details remain in `content` and `raw`.
+
+`WHATSAPP_MONITORED_GROUP_JIDS` defaults to `*` (all joined groups). Optionally
+set it in `.env` to comma-separated group IDs from `/whatsapp/groups` to restrict
+monitoring, or set it to an empty value to disable monitoring. Restart after
+changing `.env`.
+
+Only `notify` events trigger the handler. History replay, outgoing messages,
+direct chats, and protocol-only events are skipped. Up to 10,000 recent message
+identities are deduplicated in memory across socket reconnects. Handler failures
+are logged without blocking later messages; they are not automatically retried.
+This is not a durable job queue: app restarts clear deduplication, and handlers
+should use persisted message IDs for business operations requiring idempotency.
 
 ## Compile and run the project
 

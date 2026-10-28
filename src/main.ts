@@ -17,11 +17,13 @@ afraLogger.start({
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.ts';
-import { appConfiguration, logsConfiguration } from '#common';
+import { appConfiguration, logsConfiguration, setupSwagger } from '#common';
 import exchangeLogger from '@afra/exchange-logger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.enableShutdownHooks();
+  setupSwagger(app);
   const {name:appName , port} = appConfiguration().app;
   await app.listen(port);
   exchangeLogger.logger.info(`${appName} is running on port ${port}`)

@@ -1,5 +1,4 @@
-import { ILogger, Logger } from "./logger.service.ts";
-
+import { ILogger, Logger } from './logger.service.ts';
 
 export class BaseLogUtil {
   public log: ILogger;
