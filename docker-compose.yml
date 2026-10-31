@@ -1,0 +1,36 @@
+# services:
+#   whatsapp-driver:
+#     build: .
+#     restart: unless-stopped
+
+#     environment:
+#       NODE_ENV: production
+#       WHATSAPP_AUTH_DIR: /app/data/auth
+
+#     volumes:
+#       - whatsapp_auth:/app/data/auth
+
+# volumes:
+#   whatsapp_auth:
+
+services:
+  minio:
+    image: docker.afralab.ir/library/minio:RELEASE.2025-09-07T16-13-09Z
+    container_name: whatsapp-minio
+    restart: unless-stopped
+
+    command: server /data --console-address ":9001"
+
+    env_file:
+      - .env
+
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+
+    volumes:
+      - minio_data:/data
+
+volumes:
+  minio_data:
+    driver: local

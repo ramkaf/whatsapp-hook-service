@@ -154,7 +154,7 @@ decorators from `#common`. The implementation lives in
 ```ts
 @ApiControllerDocs({ tag: 'WhatsApp', bearerAuth: 'whatsapp-token' })
 @Controller('whatsapp')
-export class WhatsappController {
+export class WaConnectController {
   @Get('status')
   @ApiEndpointDocs({
     summary: 'Get connection status',

@@ -1,0 +1,568 @@
+{
+  "info": {
+    "name": "WhatsApp Connection & Groups API",
+    "description": "Baileys WhatsApp connection and group management. Base URL includes /api/v1. Group mutation requests should be run intentionally.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Connect WhatsApp",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/whatsapp/connect",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "whatsapp",
+            "connect"
+          ]
+        },
+        "description": "Initialize a WhatsApp socket or restore an existing session. No request body required."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 or 201', function () {",
+              "  pm.expect([200, 201]).to.include(pm.response.code);",
+              "});",
+              "pm.test('Response contains connection status', function () {",
+              "  pm.expect(pm.response.json()).to.have.property('status');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Connection Status",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/whatsapp/status",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "whatsapp",
+            "status"
+          ]
+        },
+        "description": "Get connection status, account JID, session information and QR availability."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Valid session status', function () {",
+              "  const valid = ['disconnected', 'connecting', 'awaiting_qr', 'connected', 'logged_out', 'error'];",
+              "  pm.expect(valid).to.include(pm.response.json().status);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Pairing QR",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/whatsapp/qr",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "whatsapp",
+            "qr"
+          ]
+        },
+        "description": "Returns the QR string and QR image as a Base64 data URL when pairing is required."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Response includes QR fields', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json).to.have.property('qr');",
+              "  pm.expect(json).to.have.property('qrDataUrl');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "WhatsApp Groups",
+      "description": "Group management APIs. All routes require a connected WhatsApp session. Mutating operations may need admin permissions. No message operations included.",
+      "item": [
+        {
+          "name": "List Joined Groups",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/whatsapp/groups",
+            "description": "Lists groups the connected WhatsApp account belongs to. Read-only. Requires active connection."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Successful HTTP response', function () {",
+                  "  pm.expect(pm.response.code).to.be.within(200, 299);",
+                  "});",
+                  "pm.test('Returns a group array', function () {",
+                  "  pm.expect(pm.response.json()).to.be.an(\"array\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Group Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/whatsapp/groups/{{groupJid}}",
+            "description": "Gets metadata for the selected group. Read-only."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Successful HTTP response', function () {",
+                  "  pm.expect(pm.response.code).to.be.within(200, 299);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Group Participants",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/whatsapp/groups/{{groupJid}}/participants",
+            "description": "Lists participants and their admin roles. Read-only."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Successful HTTP response', function () {",
+                  "  pm.expect(pm.response.code).to.be.within(200, 299);",
+                  "});",
+                  "pm.test('Contains participants', function () {",
+                  "  pm.expect(pm.response.json()).to.have.property(\"participants\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Group",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/whatsapp/groups",
+            "description": "Creates a new WhatsApp group. Mutates WhatsApp state; run intentionally.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Afra Test Group\",\n  \"participants\": [\n    \"{{participantJid}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Successful HTTP response', function () {",
+                  "  pm.expect(pm.response.code).to.be.within(200, 299);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Group Subject",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/whatsapp/groups/{{groupJid}}/subject",
+            "description": "Changes the group subject. Requires appropriate permissions.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Afra Updated Group\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Successful HTTP response', function () {",
+                  "  pm.expect(pm.response.code).to.be.within(200, 299);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Group Description",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/whatsapp/groups/{{groupJid}}/description",
+            "description": "Changes the group description. Requires appropriate permissions.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Internal coordination group\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Successful HTTP response', function () {",
+                  "  pm.expect(pm.response.code).to.be.within(200, 299);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add Group Participants",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/whatsapp/groups/{{groupJid}}/participants",
+            "description": "Adds participants. Permissions and invite/privacy settings can affect results.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"participants\": [\n    \"{{participantJid}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Successful HTTP response', function () {",
+                  "  pm.expect(pm.response.code).to.be.within(200, 299);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Remove Group Participants",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/whatsapp/groups/{{groupJid}}/participants",
+            "description": "Removes participants from the group. Requires administrative permissions.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"participants\": [\n    \"{{participantJid}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Successful HTTP response', function () {",
+                  "  pm.expect(pm.response.code).to.be.within(200, 299);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Promote Group Participants",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/whatsapp/groups/{{groupJid}}/participants/role",
+            "description": "Promotes participants to group admin.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"participants\": [\n    \"{{participantJid}}\"\n  ],\n  \"action\": \"promote\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Successful HTTP response', function () {",
+                  "  pm.expect(pm.response.code).to.be.within(200, 299);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Demote Group Participants",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/whatsapp/groups/{{groupJid}}/participants/role",
+            "description": "Demotes participants from group admin.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"participants\": [\n    \"{{participantJid}}\"\n  ],\n  \"action\": \"demote\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Successful HTTP response', function () {",
+                  "  pm.expect(pm.response.code).to.be.within(200, 299);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Group Invite Code",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/whatsapp/groups/{{groupJid}}/invite",
+            "description": "Retrieves current group invitation code. Treat as sensitive."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Successful HTTP response', function () {",
+                  "  pm.expect(pm.response.code).to.be.within(200, 299);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Revoke Group Invite Code",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/whatsapp/groups/{{groupJid}}/invite/revoke",
+            "description": "Rotates invitation code; previously shared invite links stop working."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Successful HTTP response', function () {",
+                  "  pm.expect(pm.response.code).to.be.within(200, 299);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Join Group by Invite",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/whatsapp/groups/join",
+            "description": "Joins a group using an invitation code, not the full URL.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{inviteCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Successful HTTP response', function () {",
+                  "  pm.expect(pm.response.code).to.be.within(200, 299);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Leave Group",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/whatsapp/groups/{{groupJid}}/leave",
+            "description": "Leaves the selected WhatsApp group. Mutates account membership."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Successful HTTP response', function () {",
+                  "  pm.expect(pm.response.code).to.be.within(200, 299);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "groupJid",
+      "value": "120363012345678901@g.us",
+      "type": "string"
+    },
+    {
+      "key": "participantJid",
+      "value": "989121234567@s.whatsapp.net",
+      "type": "string"
+    },
+    {
+      "key": "inviteCode",
+      "value": "REPLACE_WITH_INVITE_CODE",
+      "type": "string"
+    }
+  ]
+}
